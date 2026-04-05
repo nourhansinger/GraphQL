@@ -93,6 +93,11 @@ export const resolvers = {
 
     Mutation: {
         register: async (_, args, context) => {
+            if (!args.user.email || !args.user.password) {
+                throw new GraphQLError('You must provide email and password', {
+                    extensions: { code: 'BAD_USER_INPUT' }
+                })
+            }
             const hashedPassword = await bcrypt.hash(args.user.password, 10)
 
             const user = await context.dataSources.users.create({
