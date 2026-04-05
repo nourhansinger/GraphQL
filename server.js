@@ -5,6 +5,10 @@ import { resolvers } from "./resolvers.js";
 import mongoose from "mongoose";
 import { loadEnvFile } from 'node:process'
 import jwt from "jsonwebtoken";
+import TodoDataSource from "./dataSources/TodoDataSource.js";
+import UserDataSource from "./dataSources/UserDataSource.js";
+import todoModel from "./models/todos.js";
+import userModel from "./models/users.js";
 
 
 
@@ -34,12 +38,17 @@ const info = await startStandaloneServer(server, {
         port
     },
     context: ({ req }) => {
+        let auth = {}
         let { authorization } = req.headers
         if (authorization) {
-            let decoded = jwt.verify(authorization, process.env.SECRET)//{id,role}
-            return decoded
-        }else{
-            return {}
+            auth = jwt.verify(authorization, process.env.SECRET)//{id,role}
+        }
+        return {
+            ...auth,
+            dataSources: {
+                todos: new TodoDataSource(todoModel),
+                users: new UserDataSource(userModel)
+            }
         }
     }
 })

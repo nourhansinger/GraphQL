@@ -1,8 +1,6 @@
 import { GraphQLError } from "graphql/error/GraphQLError.js"
-import userModel from "./models/users.js"
 import jwt from 'jsonwebtoken'
 import bcrypt from "bcryptjs"
-import todoModel from "./models/todos.js"
 
 function checkAuth(context) {
     if (!context.id || !context.role) {
@@ -29,7 +27,7 @@ export const resolvers = {
 
         users: async (_, __, context) => {
             checkAdmin(context)
-            const users = await userModel.find()
+            const users = await context.dataSources.users.getAll()
             return users
         },
 
@@ -42,7 +40,7 @@ export const resolvers = {
                 })
             }
 
-            const user = await userModel.findById(id)
+            const user = await context.dataSources.users.getById(id)
 
             if (!user) {
                 throw new GraphQLError("User not found", {
@@ -55,13 +53,13 @@ export const resolvers = {
 
         todos: async (_, __, context) => {
             checkAdmin(context)
-            return await todoModel.find()
+            return await context.dataSources.todos.getAll()
         },
 
         todo: async (_, { id }, context) => {
             checkAuth(context)
 
-            const todo = await todoModel.findById(id)
+            const todo = await context.dataSources.todos.getById(id)
 
             if (!todo) {
                 throw new GraphQLError('Todo not found', {
@@ -87,17 +85,17 @@ export const resolvers = {
                 })
             }
 
-            const todos = await todoModel.find({ userId })
+            const todos = await context.dataSources.todos.getByUser(userId)
 
             return todos
         },
     },
 
     Mutation: {
-        register: async (_, args) => {
+        register: async (_, args, context) => {
             const hashedPassword = await bcrypt.hash(args.user.password, 10)
 
-            const user = await userModel.create({
+            const user = await context.dataSources.users.create({
                 ...args.user,
                 password: hashedPassword
             })
@@ -105,7 +103,7 @@ export const resolvers = {
             return user
         },
 
-        login: async (_, { user }) => {
+        login: async (_, { user }, context) => {
             let { email, password } = user
 
             if (!email || !password) {
@@ -114,7 +112,7 @@ export const resolvers = {
                 })
             }
 
-            const foundedUser = await userModel.findOne({ email })
+            const foundedUser = await context.dataSources.users.getByEmail(email)
 
             if (!foundedUser) {
                 throw new GraphQLError('User not found', {
@@ -142,7 +140,7 @@ export const resolvers = {
         addTodo: async (_, { todo }, context) => {
             checkAuth(context)
 
-            const newTodo = await todoModel.create({
+            const newTodo = await context.dataSources.todos.create({
                 ...todo,
                 userId: context.id
             })
@@ -153,7 +151,7 @@ export const resolvers = {
         updateTodo: async (_, { id, todo }, context) => {
             checkAuth(context)
 
-            const existingTodo = await todoModel.findById(id)
+            const existingTodo = await context.dataSources.todos.getById(id)
 
             if (!existingTodo) {
                 throw new GraphQLError('Todo not found', {
@@ -167,7 +165,7 @@ export const resolvers = {
                 })
             }
 
-            const updatedTodo = await todoModel.findByIdAndUpdate(id, todo, { new: true })
+            const updatedTodo = await context.dataSources.todos.update(id, todo)
 
             return updatedTodo
         },
@@ -175,7 +173,7 @@ export const resolvers = {
         deleteTodo: async (_, { id }, context) => {
             checkAuth(context)
 
-            const todo = await todoModel.findById(id)
+            const todo = await context.dataSources.todos.getById(id)
 
             if (!todo) {
                 throw new GraphQLError('Todo not found', {
@@ -189,9 +187,7 @@ export const resolvers = {
                 })
             }
 
-            await todoModel.findByIdAndDelete(id)
-
-            return "Todo deleted successfully"
+            return await context.dataSources.todos.delete(id)
         },
 
         updateUser: async (_, { id, user }, context) => {
@@ -203,7 +199,7 @@ export const resolvers = {
                 })
             }
 
-            const updatedUser = await userModel.findByIdAndUpdate(id, user, { new: true })
+            const updatedUser = await context.dataSources.users.update(id, user)
 
             return updatedUser
         },
@@ -217,22 +213,20 @@ export const resolvers = {
                 })
             }
 
-            await userModel.findByIdAndDelete(id)
-
-            return "User deleted successfully"
+            return await context.dataSources.users.delete(id)
         }
     },
 
     User: {
-        todos: async (parent) => {
-            const todos = await todoModel.find({ userId: parent._id })
+        todos: async (parent, _, context) => {
+            const todos = await context.dataSources.todos.getByUser(parent._id)
             return todos
         }
     },
 
     Todo: {
-        user: async (parent) => {
-            const user = await userModel.findOne({ _id: parent.userId })
+        user: async (parent, _, context) => {
+            const user = await context.dataSources.users.getById(parent.userId)
             return user
         }
     }
